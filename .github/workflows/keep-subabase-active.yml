@@ -16,23 +16,24 @@ jobs:
         
       - name: Ping Supabase Database
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: https://ebfgyremgthpuoagbblo.supabase.co
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           echo "🔄 Pinging Supabase database to keep it active..."
           echo "Timestamp: $(date)"
+          echo "Supabase Project: ebfgyremgthpuoagbblo"
           
-          # Check if secrets are set
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "❌ Error: SUPABASE_URL or SUPABASE_ANON_KEY secrets not set"
+          # Check if secret is set
+          if [ -z "$SUPABASE_KEY" ]; then
+            echo "❌ Error: SUPABASE_KEY secret not set"
             exit 1
           fi
           
           # Method 1: Simple REST API call to count lakes
           HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json \
             -X GET "${SUPABASE_URL}/rest/v1/lakes?select=count" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
             -H "Content-Type: application/json")
           
           echo "HTTP Response Code: $HTTP_CODE"
@@ -41,7 +42,7 @@ jobs:
             echo "✅ Database ping successful!"
             echo "Response: $(cat response.json)"
           elif [ "$HTTP_CODE" -eq 401 ]; then
-            echo "❌ Authentication failed - check your SUPABASE_ANON_KEY"
+            echo "❌ Authentication failed - check your SUPABASE_KEY"
             exit 1
           elif [ "$HTTP_CODE" -eq 404 ]; then
             echo "⚠️  Lakes table not found, trying basic connection..."
@@ -52,15 +53,15 @@ jobs:
       - name: Fallback Health Check
         if: always()
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: https://ebfgyremgthpuoagbblo.supabase.co
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           echo "🔄 Performing fallback health check..."
           
           # Fallback: Basic health check
           HTTP_CODE=$(curl -s -w "%{http_code}" -o health.json \
             -X GET "${SUPABASE_URL}/rest/v1/" \
-            -H "apikey: ${SUPABASE_ANON_KEY}")
+            -H "apikey: ${SUPABASE_KEY}")
           
           echo "Health check HTTP Code: $HTTP_CODE"
           
@@ -75,6 +76,6 @@ jobs:
           
       - name: Log Success
         run: |
-          echo "🎣 Fishing app database kept active!"
+          echo "🎣 Fishing app database (ebfgyremgthpuoagbblo) kept active!"
           echo "Next scheduled ping: $(date -d '+5 days' 2>/dev/null || date -v+5d 2>/dev/null || echo 'in 5 days')"
           echo "✅ Workflow completed successfully"
