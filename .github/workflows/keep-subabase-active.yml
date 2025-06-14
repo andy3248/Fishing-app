@@ -1,0 +1,80 @@
+name: Keep Supabase Database Active
+
+on:
+  schedule:
+    # Run every 5 days at 12:00 PM UTC
+    - cron: '0 12 */5 * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  ping-database:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Ping Supabase Database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "🔄 Pinging Supabase database to keep it active..."
+          echo "Timestamp: $(date)"
+          
+          # Check if secrets are set
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "❌ Error: SUPABASE_URL or SUPABASE_ANON_KEY secrets not set"
+            exit 1
+          fi
+          
+          # Method 1: Simple REST API call to count lakes
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o response.json \
+            -X GET "${SUPABASE_URL}/rest/v1/lakes?select=count" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            -H "Content-Type: application/json")
+          
+          echo "HTTP Response Code: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Database ping successful!"
+            echo "Response: $(cat response.json)"
+          elif [ "$HTTP_CODE" -eq 401 ]; then
+            echo "❌ Authentication failed - check your SUPABASE_ANON_KEY"
+            exit 1
+          elif [ "$HTTP_CODE" -eq 404 ]; then
+            echo "⚠️  Lakes table not found, trying basic connection..."
+          else
+            echo "⚠️  Primary ping failed with code $HTTP_CODE, trying fallback..."
+          fi
+          
+      - name: Fallback Health Check
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "🔄 Performing fallback health check..."
+          
+          # Fallback: Basic health check
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o health.json \
+            -X GET "${SUPABASE_URL}/rest/v1/" \
+            -H "apikey: ${SUPABASE_ANON_KEY}")
+          
+          echo "Health check HTTP Code: $HTTP_CODE"
+          
+          if [ "$HTTP_CODE" -eq 200 ] || [ "$HTTP_CODE" -eq 404 ]; then
+            echo "✅ Database connection confirmed!"
+            echo "Database is active and responding"
+          else
+            echo "❌ Database health check failed with code $HTTP_CODE"
+            cat health.json 2>/dev/null || echo "No response body"
+            exit 1
+          fi
+          
+      - name: Log Success
+        run: |
+          echo "🎣 Fishing app database kept active!"
+          echo "Next scheduled ping: $(date -d '+5 days' 2>/dev/null || date -v+5d 2>/dev/null || echo 'in 5 days')"
+          echo "✅ Workflow completed successfully"
